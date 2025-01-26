@@ -5,7 +5,7 @@
 #include<unistd.h>
 
 
-void getPflag(int flag){
+void print_segment_flag(int flag){
 
 
 	switch(flag){
@@ -198,7 +198,8 @@ void print_osabi(char code){
 
 
 
-int main(){
+int main(int argc, char* argv[]){
+
 	Elf64_Ehdr header;
 	Elf64_Shdr section_header;
 	Elf64_Phdr program_header;
@@ -207,78 +208,86 @@ int main(){
 	char filename[] = "sample";
 
 
-	int fd = open(filename, O_RDONLY);
 	char buffer[5];
 	char section_name[256];
 	short int i = 0;
+	int fd;
+   if(argc != 2){
+	
+		   printf("Usage: :/elf_parser.c <binary_name>\n");
+		   exit(1);
+	
+   }else{
 
-	if(read(fd, &header, sizeof(Elf64_Ehdr))!=sizeof(Elf64_Ehdr)){
-		printf("Errore");
-	}else{
 		
-			printf("Specifiche del binario '%s': \n", filename);
-			printf("\t--> Sistema: ");
-			print_osabi(header.e_ident[EI_OSABI]);
-			printf("\n\t--> Tipo:");
-			print_type(header.e_type);
-			printf("\n\t--> Istruction Set: ");
-			print_machineset(header.e_machine);
-			printf("\n\t--> Versione ELF: %x.0\n\n", header.e_version);
-            
-			if(lseek(fd, header.e_phoff, SEEK_SET) > 0){
+		   fd = open(argv[1], O_RDONLY);
+		   if(!fd){
+				printf("file %s could not be open. Exiting\n", argv[1]);
+				exit(1);
+			}else{
 				
-					printf("Segmenti: \n");
-
-					for(i = 0; i < header.e_phnum; i++){
-
-						if(read(fd, &program_header, sizeof(Elf64_Phdr)) != sizeof(Elf64_Phdr)){
-							exit(1);
-						}
-						printf("--<%d>: ", i);
-						print_seg_type(program_header.p_type);
-						getPflag(program_header.p_flags);
-						printf("- Size (Disk) %ld Bytes", program_header.p_filesz / 8);
-						printf("- Size (Ram) %ld Bytes \n", program_header.p_memsz / 8);
-
-					}
-
-
-
-		    }
-
-			lseek(fd, header.e_shoff + header.e_shstrndx * sizeof(Elf64_Shdr), SEEK_SET);
-			read(fd, &str_index, sizeof(Elf64_Shdr));
-			if(lseek(fd, header.e_shoff, SEEK_SET) > 0){
+			if(read(fd, &header, sizeof(Elf64_Ehdr))!=sizeof(Elf64_Ehdr)){
+			    	printf("Errore");
+			}else{
 				
-					printf("\nSezioni: ");
-					for(i = 0; i < header.e_shnum; i ++){
-							
-						if(lseek(fd, header.e_shoff + i * sizeof(Elf64_Shdr), SEEK_SET) < 0){
-								exit(1);
-						}else{
-								read(fd, &section_header, sizeof(Elf64_Shdr));
-								lseek(fd, str_index.sh_offset + section_header.sh_name, SEEK_SET);
-								read(fd, section_name, sizeof(char) * 100);
-								printf("<%d> section '%s' - ", i, section_name);
-								print_section_type(section_header.sh_type);
-								print_section_flag(section_header.sh_flags);
-								printf("- Size %ld \n", section_header.sh_size / 8);
-
-
-
-						}
-
-					}
-
-			}
-
-
-
-
-
-
+					printf("ELF file of '%s': \n", filename);
+					printf("\t--> System: ");
+					print_osabi(header.e_ident[EI_OSABI]);
+					printf("\n\t--> Type:");
+					print_type(header.e_type);
+					printf("\n\t--> Istruction Set: ");
+					print_machineset(header.e_machine);
+					printf("\n\t-->  ELF version: %d.0\n\n", header.e_version);
 					
+					if(lseek(fd, header.e_phoff, SEEK_SET) > 0){
+						
+							printf("Segments: \n");
 
-	}
+							for(i = 0; i < header.e_phnum; i++){
 
+								if(read(fd, &program_header, sizeof(Elf64_Phdr)) != sizeof(Elf64_Phdr)){
+									exit(1);
+								}
+								printf("\t--<%d>: type: ", i);
+								print_seg_type(program_header.p_type);
+								print_segment_flag(program_header.p_flags);
+								printf("\t- Size(Disk) %ld Bytes", program_header.p_filesz / 8);
+								printf("\t- Size(Ram) %ld Bytes \n", program_header.p_memsz / 8);
+
+							}
+
+
+
+					}
+
+					lseek(fd, header.e_shoff + header.e_shstrndx * sizeof(Elf64_Shdr), SEEK_SET);
+					read(fd, &str_index, sizeof(Elf64_Shdr));
+					if(lseek(fd, header.e_shoff, SEEK_SET) > 0){
+						
+							printf("\nSections: \n");
+							for(i = 0; i < header.e_shnum; i ++){
+									
+								if(lseek(fd, header.e_shoff + i * sizeof(Elf64_Shdr), SEEK_SET) < 0){
+										exit(1);
+								}else{
+										read(fd, &section_header, sizeof(Elf64_Shdr));
+										lseek(fd, str_index.sh_offset + section_header.sh_name, SEEK_SET);
+										read(fd, section_name, sizeof(char) * 100);
+										printf("\t--<%d> section '%s' - ", i, section_name);
+										print_section_type(section_header.sh_type);
+										print_section_flag(section_header.sh_flags);
+										printf("- Size %ld Bytes, ", section_header.sh_size / 8);
+								        printf("Range <0x%lx> - <0x%lx>\n", section_header.sh_addr, section_header.sh_addr + section_header.sh_size);
+
+
+
+								}
+
+							}
+
+				     }						
+	           }
+
+		}
+   }
 }
